@@ -1,0 +1,269 @@
+openapi: "3.0.0"
+info:
+  version: 1.0.0
+  title: Dataset Management Schedules API
+  description: >-
+    The Dataset Management Schedules API is for viewing, managing, running dataset schedules on the Socrata Platform. Please note that these docs are still under active development. For now they focus on detailing how to: list and view the status of schedules on your domain; and run a schedule on an ad-hoc basis using "run now". In the future, the API for running schedules may be superceded in certain use cases by a separate API for running a gateway plugin job without needing to create a schedule. 
+
+servers:
+  - url: https://{domain-name}
+    variables:
+      domain-name:
+        default: demo
+        description: Your domain name
+
+security:
+  - basicAuth: []
+
+paths:
+  /api/publishing/v1/schedule:
+    get:
+      description: Get a listing of all `Schedule` objects for domain. Use this endpoint to see the status of all schedules for datasets currently configured on your domain. It returns an array of `Schedule` objects. Each `Schedule` object refers to a schedule for a dataset (represented by the fourfour property or 4x4 ID of the dataset) and provides information such as whether schedule is currently running, when the schedule was last run, the cadence of the schedule (represented in cron notation), whether the schedule is currently paused in addition to other details. 
+      tags:
+        - schedule
+      responses:
+        "200":
+          description: List all `Schedule` objects for domain.
+          content:
+            application/json:
+              schema:
+                title: ScheduleListSuccess
+                type: array
+                items:
+                  $ref: "#/components/schemas/Schedule"
+  /api/publishing/v1/schedule/{datasetId}:
+    parameters:
+      - $ref: "#/components/parameters/datasetId"
+    get:
+      description: >-
+        Get details for the `Schedule` object for the dataset specified by the 4x4 dataset id. A `Schedule` object provides information such as whether schedule is currently running, when the schedule was last run, the cadence of the schedule (represented in cron notation), whether the schedule is currently paused in addition to other details.
+      tags:
+        - schedule
+      responses:
+        "200":
+          description: Details for `Schedule` object for the dataset specified by the 4x4 dataset id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+  /api/publishing/v1/schedule/{datasetId}/run:
+    parameters:
+      - $ref: "#/components/parameters/datasetId"
+    put:
+      description: >-
+        Run the `Schedule` for the dataset specified by the 4x4 id. Using a PUT request you can kick-off a schedule for a dataset in ad-hoc basis. This corresponds to hitting the "run now" button in the UI for a dataset through the primer page.
+      operationId: runSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              nullable: true
+      tags:
+        - schedule
+      responses:
+        "202":
+          description: "Accpeted: schedule is initiated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+  parameters:
+    datasetId:
+      name: datasetId
+      in: path
+      description: The unique identifier for a dataset
+      required: true
+      schema:
+        type: string
+  schemas:
+    Schedule:
+      type: object
+      properties:
+        resource:
+          $ref: "#/components/schemas/Resource"
+        links:
+          type: object
+          description: CRUD endpoints for the specified schedule
+          properties:
+            update:
+              type: string
+              description: A PUT endpoint to update a schedule for a specified dataset.
+            show:
+              type: string
+              description: A GET endpoint to view the schedule if present for a specified dataset.
+            run:
+              type: string
+              description: A PUT endpoint to run a schedule immediately.
+            list:
+              type: string
+              description: A GET endpoint to list all available schedules for a domain.
+            delete:
+              type: string
+              description: A POST endpoint to delete a schedule for a specified dataset
+            create:
+              type: string
+              description: A POST endpoint to create a new schedule for a specified dataset.
+    Resource:
+      type: object
+      properties:
+        runstate:
+          type: object
+          properties:
+            state:
+              type: string
+        run_requested:
+          type: boolean
+          description: Boolean value indicating whether there is a pending request for this schedule
+        paused_due_to_failure:
+          type: boolean
+          description: A boolean indicating whether the schedule currently paused due to repeated failures.
+        paused:
+          type: boolean
+          description: A boolean indicating whether the schedule currently paused.
+        last_run:
+          type: string
+          format: date-time
+          description: A date time value indicating when the schedule last ran.
+        id:
+          type: string
+          description: The `Schedule` identifier.
+        fourfour:
+          type: string
+          pattern: '^\w{4}-\w{4}$'
+          description: The dataset identifier (4x4) for the schedule.
+        domain_id:
+          type: string
+          description: The domain identifier.
+        created_by:
+          $ref: "#/components/schemas/User"
+        dataset_name:
+          type: string
+          description: The name of the dataset for the schedule.
+        consecutive_failures:
+          type: number
+          description: The current number of consecutive failures since the schedule last run successfully.
+        cadence:
+          type: object
+          properties:
+            timezone:
+              type: string
+              description: The timezone in which the schedule is set.
+            start:
+              type: string
+              nullable: true
+            interval_minutes:
+              type: integer
+            cron:
+              type: string
+              description: The cron expression indicating the schedule cadence. This is generated by the platform based on the schedule selected through the UI.
+        action:
+          type: object
+          properties:
+            type:
+              type: string
+            parameters:
+              type: object
+              properties:
+                path:
+                  type: array
+                  items:
+                    type: string
+                parameters:
+                  type: object
+                namespace:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    name:
+                      type: string
+                human_path:
+                  type: array
+                  items:
+                    type: string
+                agent_uid:
+                  type: string
+                agent:
+                  type: object
+                  properties:
+                    went_online_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                      description: The last time the agent went online. "NULL" if the agent is currently offline.
+                    went_offline_at:
+                      type: string
+                      format: date-time
+                      nullable: true
+                      description: The last time an agent went offline. "NULL" if the agent is currently online.
+                    version:
+                      type: object
+                      properties:
+                        version:
+                          type: string
+                        sha256:
+                          type: string
+                        release_notes:
+                          type: string
+                        location:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                    owned_by:
+                      $ref: "#/components/schemas/User"
+                    namespaces:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/Namespace"
+                    name:
+                      type: string
+                    log_level:
+                      type: string
+                    ex_namespace:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          namespace:
+                            $ref: "#/components/schemas/Namespace"
+                          last_seen:
+                            type: string
+                            format: date-time
+                    created_by:
+                      $ref: "#/components/schemas/User"
+                      description: The user who created the agent.
+                    created_at:
+                      type: string
+                      format: date-time
+                      description: The date and time the agent was created.
+                    agent_uid:
+                      type: string
+                      description: the unique identifier for the agent.
+    User:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: '^\w{4}-\w{4}$'
+        email:
+          type: string
+        display_name:
+          type: string
+    Namespace:
+      type: object
+      properties:
+        type:
+          type: string
+        options:
+          type: string
+          nullable: true
+        name:
+          type: string
